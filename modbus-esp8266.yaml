@@ -1,0 +1,462 @@
+esphome:
+  name: modbus-esp8266
+  friendly_name: modbus-esp8266
+
+esp8266:
+  board: d1_mini
+
+# disable UART logging, need hardware for modbus
+logger:
+  baud_rate: 0
+
+# name your device
+substitutions:
+ heat_pump_name: rotenso
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret esp8266_api_key
+
+ota:
+  password: !secret esp8266_ota_pwd
+
+wifi:
+  networks:
+  - ssid: !secret wifi1_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi2_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi3_ssid
+    password: !secret wifi_password
+    
+  # Enable fallback hotspot in case wifi connection fails
+  ap:
+    ssid: "modbus-esp8266 Fallback Hotspot"
+    password: !secret esp8266_wifi_fallback_pwd
+
+captive_portal:
+
+text_sensor:
+  # Send Uptime in raw seconds
+  - platform: template
+    name: Uptime
+    id: uptime_human
+    icon: mdi:clock-start
+
+uart:
+  rx_pin: RX 
+  tx_pin: TX  
+  baud_rate: 9600
+  #these are defaults, just show for clarity
+  stop_bits: 1
+  parity: NONE
+  data_bits: 8
+
+modbus:
+  id: modbus_heatpump
+
+modbus_controller:
+  - id: modbus_1
+    ## the Modbus device addr
+    address: 0x1
+    modbus_id: modbus_heatpump
+    setup_priority: -10
+#    update_interval: 15s
+
+
+#SWITCHES, SLIDERS
+
+switch:
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R0B2_dhw
+    name: hp_R0B2_dhw_heating 
+    #R0,B2 0: DHW(T5S) power off; 1: DHW(T5S) power on
+    register_type: holding
+    address: 0
+    bitmask: 0x4
+    entity_category: config
+    icon: "mdi:toggle-switch"
+  
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R0B1_heating
+    name: hp_R0B1_floor_heating
+    #R0,B1: 0: power off floor heating; 1: power on floor heating;(zone 1)(water flow temperature control)
+    register_type: holding
+    address: 0
+    bitmask: 0x2
+    entity_category: config
+    icon: "mdi:toggle-switch"
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R5B4_Disinfect
+    name: hp_R5B4_disinfect
+    #R5B5 disinfect
+    register_type: holding
+    address: 5
+    bitmask: 0x10
+    entity_category: config
+    icon: "mdi:toggle-switch"
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R5B6_SilentMode
+    name: hp_R5B6_Silent_Mode
+    #R5,B6: silent mode
+    register_type: holding
+    address: 5
+    bitmask: 0x40
+    entity_category: config
+    icon: "mdi:toggle-switch"
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R5B7_SilentModeLevel
+    name: hp_R5B7_Silent_Mode_Level
+    #R5,B7: 0: Silent mode level1; 1: Silent mode level2
+    register_type: holding
+    address: 5
+    bitmask: 0x80
+    entity_category: config
+    icon: "mdi:toggle-switch"
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R5_B10_ECO_Mode
+    name: hp_R5B10_ECO_mode
+    # R5,B10 ECO Mode
+    register_type: holding
+    address: 5
+    bitmask: 0x400
+    entity_category: config
+    icon: "mdi:toggle-switch"
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R5_B12_Curve1_On
+    name: hp_R5B12_Curve1_On
+    # R5,B12 Curve1 On
+    register_type: holding
+    address: 5
+    bitmask: 0x1000
+    entity_category: config
+    icon: "mdi:toggle-switch"
+
+number:
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R5_T5s
+    name: "hp_T5s_DHW_target_temperature"
+    register_type: holding
+    address: 4
+    value_type: U_WORD
+    min_value: 40
+    max_value: 60
+    mode: box
+    entity_category: config
+    unit_of_measurement: "°C"
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R2_temp_Zone1
+    name: "hp_R2_temp_Zone1"
+    # R2 Water temperature T1S floor heating Zone1
+    register_type: holding
+    address: 0x02 
+    bitmask: 0xFF
+    value_type: U_WORD
+    min_value: 20
+    max_value: 35
+    mode: box
+    entity_category: config
+    unit_of_measurement: "°C"
+  
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R6_curve
+    name: "hp_R6_curve1"
+    # R6 B0-7 Climate Curve 1-9(zone 1)
+    register_type: holding
+    address: 0x06 
+    bitmask: 0xFF
+    value_type: U_WORD  
+    entity_category: config
+    min_value: 1
+    max_value: 9
+    mode: box
+
+
+#-----------------------------------------------------------------------
+#READING BIT SENSORS
+#binary sensors
+binary_sensor:
+
+#  - platform: modbus_controller
+#    id: ${heat_pump_name}_R0B0_room_temperature_control
+#    name: hp_R0B0_floor_heating
+#    #R0,B0: room temperature control
+#    register_type: holding
+#    address: 0
+#    bitmask: 0x1
+
+#  - platform: modbus_controller
+#    id: ${heat_pump_name}_R5B11_constant_temp_water_recycling
+#    name: hp_R5B11_constant_water_recycling
+#    # R5,B11: HW pump's running constant-temperature water recycling
+#    register_type: holding
+#    address: 5
+#    bitmask: 0x800
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R5B5_Holiday_away
+    name: hp_R5B5_holiday_away
+    #R5B5 Holiday away (the status can only be read, but cannot be changed)
+    register_type: holding
+    address: 5
+    bitmask: 0x20
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R5B8_Holiday_Home
+    name: hp_R0B8_holiday_Home
+    # R5,B8 Holiday home (the status can only be read, not changed)
+    register_type: holding
+    address: 5
+    bitmask: 0x100
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R128B1_Defrosting
+    name: hp_R128B1_Defrosting
+    #R128B1_Defrosting
+    register_type: holding
+    address: 128
+    bitmask: 0x02
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R129B0_IBH
+    name: hp_R129B0_IBH
+    #R129B0_IBH
+    register_type: holding
+    address: 129
+    bitmask: 0x1
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R129B1_IBH2
+    name: hp_R129B1_IBH2
+    #R129B1_IBH2
+    register_type: holding
+    address: 129
+    bitmask: 0x2
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R129B2_TBH
+    name: hp_R129B2_TBH
+    #R129B2_TBH
+    register_type: holding
+    address: 129
+    bitmask: 0x4
+      
+  - platform: modbus_controller
+    id: ${heat_pump_name}_R129B15_Defrosting
+    name: hp_R129B15_Defrosting
+    #R129B15_Defrosting
+    register_type: holding
+    address: 129
+    bitmask: 0x8000
+
+
+# End of binary sensors
+
+sensor:  
+#by registry number, like : _100
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_100 # Compressor operating frequency in Hz
+    name: "hp_compressor_frequency" 
+    state_class: measurement
+    register_type: holding
+    address: 0x64 #dec 100
+    unit_of_measurement: "Hz"
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_102 # Fan speed, in r/min
+    name: "hp_fan_speed_rpm"
+    state_class: measurement
+    register_type: holding
+    address: 0x66 # 
+    unit_of_measurement: "rpm"
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_104 #Water inlet temperature
+    name: "hp_TW_in_Entering_Water_Temperature"
+    state_class: measurement
+    register_type: holding
+    address: 0x68
+    unit_of_measurement: "°C"
+    value_type: S_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_105 # Water outlet temperature
+    name: "hp_TW_out_Leaving_Water_Temperature"
+    state_class: measurement
+    register_type: holding
+    address: 0x69
+    unit_of_measurement: "°C"
+    value_type: S_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_107 # Outdoor ambient temperature 
+    name: "hp_T4_outdoor_temperature"
+    state_class: measurement
+    register_type: holding
+    address: 0x6B
+    unit_of_measurement: "°C"
+    value_type: S_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_110 # Total water outlet temperature
+    name: "hp_T1_Leaving_Water_Temperature"
+    state_class: measurement
+    register_type: holding
+    address: 0x6E
+    unit_of_measurement: "°C"
+    value_type: S_WORD
+  
+  - platform: modbus_controller
+    id: ${heat_pump_name}_114 # Room temperature
+    name: "Ta_room_temperature"
+    state_class: measurement
+    register_type: holding
+    address: 0x72
+    unit_of_measurement: "°C"
+    value_type: S_WORD
+  
+  - platform: modbus_controller
+    id: ${heat_pump_name}_115 # Water tank temperature
+    name: "T5_Storage_Tank_Water_Temperature"
+    state_class: measurement
+    register_type: holding
+    address: 0x73
+    unit_of_measurement: "°C"
+    value_type: S_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_118 # Outdoor unit operating current A
+    name: "hp_ODU_Current"
+    state_class: measurement
+    register_type: holding
+    address: 0x76
+    unit_of_measurement: "A"
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_119 # Outdoor unit voltage  V
+    name: "hp_ODU_Voltage"
+    state_class: measurement
+    register_type: holding
+    address: 0x77
+    unit_of_measurement: "V"
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_122 # Compressor operating time in hour
+    name: "hp_compressor_runnning_time"
+    state_class: total_increasing
+    register_type: holding
+    address: 0x7A
+    unit_of_measurement: "h"
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_133 # DC bus current A
+    name: "hp_DC_bus_current"
+    state_class: measurement
+    register_type: holding
+    address: 0x85
+    unit_of_measurement: "A"
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_134 # DC bus voltage, the actual value/10
+    name: "hp_DC_bus_voltage"
+    state_class: measurement
+    register_type: holding
+    address: 0x86
+    unit_of_measurement: "V"
+    value_type: U_WORD
+  #  accuracy_decimals: 1
+    filters:
+      - multiply: 10
+  
+  - platform: modbus_controller
+    id: ${heat_pump_name}_136 # Climate curve T1S calculated value zone 1
+    name: "T1S_curve_calculated_value_zone1"
+    state_class: measurement
+    register_type: holding
+    address: 0x88
+    unit_of_measurement: "°C"
+    value_type: S_WORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_138 # The actual value*100 m3/H
+    name: "hp_water_flow current_value"
+    state_class: measurement
+    register_type: holding
+    address: 0x8A
+    unit_of_measurement: "m³/h"
+    value_type: U_WORD
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_140 # Ability of hydraulic module, actual value*100 kW
+    name: "hp_IDU_capacity_current_value"
+    state_class: measurement
+    register_type: holding
+    address: 0x8C
+    unit_of_measurement: "kW"
+    value_type: U_WORD
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+    
+  - platform: modbus_controller
+    id: ${heat_pump_name}_143_dword
+    name: "hp_energy_consumption"
+    state_class: total_increasing
+    register_type: holding
+    address: 0x8F
+    unit_of_measurement: "kWh"
+    value_type: U_DWORD
+
+  - platform: modbus_controller
+    id: ${heat_pump_name}_145_dword
+    name: "hp_heating_capacity"
+    state_class: total_increasing
+    register_type: holding
+    address: 0x91
+    unit_of_measurement: "kWh"
+    value_type: U_DWORD
+
+#config values
+
+# uptime sensor  
+   
+  - platform: uptime
+    name: hp_uptime
+    id: uptime_sensor
+    update_interval: 60s
+    on_raw_value:
+      then:
+        - text_sensor.template.publish:
+            id: uptime_human
+            # Custom C++ code to generate the result
+            state: !lambda |-
+              int seconds = round(id(uptime_sensor).raw_state);
+              int days = seconds / (24 * 3600);
+              seconds = seconds % (24 * 3600);
+              int hours = seconds / 3600;
+              seconds = seconds % 3600;
+              int minutes = seconds /  60;
+              seconds = seconds % 60;
+              return (
+                (days ? to_string(days) + "d " : "") +
+                (hours ? to_string(hours) + "h " : "") +
+                (minutes ? to_string(minutes) + "m " : "") +
+                (to_string(seconds) + "s")
+              ).c_str(); 
